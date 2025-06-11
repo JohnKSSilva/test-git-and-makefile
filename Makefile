@@ -32,15 +32,16 @@ cherry-pick-to-staging:
     git checkout staging; \
     for commit in $$(git log main..$$ORIG_BRANCH --pretty=format:"%H" | tac); do \
         COMMIT_MSG=$$(git log --format=%B -n 1 $$commit | head -n 1); \
-        if git cherry staging $$commit | grep -q '^+ '; then \
-            echo "Cherry-picking commit: $$COMMIT_MSG"; \
-            if ! git cherry-pick -x $$commit; then \
+        echo "Cherry-picking commit: $$COMMIT_MSG"; \
+        if ! git cherry-pick -x $$commit 2>&1 | tee /tmp/cherry-pick.log | grep -q "The previous cherry-pick is now empty"; then \
+            if grep -q "The previous cherry-pick is now empty" /tmp/cherry-pick.log; then \
+                echo "Skipping commit (already applied): $$COMMIT_MSG"; \
+                git cherry-pick --skip; \
+            elif [ $$? -ne 0 ]; then \
                 echo "❌ Cherry-pick failed. Resolve conflicts and run 'git cherry-pick --continue'"; \
                 echo "After resolving, run 'git checkout $$ORIG_BRANCH' to return to your branch"; \
                 exit 1; \
             fi; \
-        else \
-            echo "Skipping commit (already in staging): $$COMMIT_MSG"; \
         fi; \
     done; \
     git push origin staging; \
@@ -49,17 +50,28 @@ cherry-pick-to-staging:
 
 # Check which commits would be cherry-picked without actually doing it
 check-commits-to-staging:
-	@echo "Checking commits that would be cherry-picked from main to staging..."
-	@git fetch origin main staging
-	@COMMITS=$$(git log main..$(CURRENT_BRANCH) --pretty=format:"%h - %s (%an)" | tac); \
-	if [ -z "$$COMMITS" ]; then \
-		echo "No new commits to cherry-pick"; \
-		exit 1; \
-	else \
-		echo "The following commits would be cherry-picked to staging:"; \
-		echo "$$COMMITS" | while read commit; do \
-			echo "$$commit"; \
-		done; \
-		echo ""; \
-		echo "Total: $$(echo "$$COMMITS" | wc -l) commit(s)"; \
-	fi
+	@echo "Checking commits that would be cherry-picked from main to staging..."; \
+    git fetch origin main staging; \
+    ORIG_BRANCH=$(CURRENT_BRANCH); \
+    COMMITS=$$(git log main..$$ORIG_BRANCH --pretty=format:"%H" | tac); \
+    STAGING_PATCHES=$$(git log main..staging --pretty=format:"%H" | xargs -n1 git show --pretty=format:%P --no-patch | xargs -n1 git show --pretty=format:%B --no-patch | git patch-id --stable | cut -d' ' -f1 | tr '\n' ' '); \
+    NEEDED=""; \
+    for commit in $$COMMITS; do \
+        PATCH_ID=$$(git show $$commit | git patch-id --stable | cut -d' ' -f1); \
+        case " $$STAGING_PATCHES " in \
+            *$$PATCH_ID*) \
+                : ;; \
+            *) \
+                COMMIT_MSG=$$(git log --format="%h - %s (%an)" -n 1 $$commit); \
+                NEEDED="$$NEEDED\n$$COMMIT_MSG"; \
+            ;; \
+        esac; \
+    done; \
+    if [ -z "$$NEEDED" ]; then \
+        echo "No new commits to cherry-pick"; \
+    else \
+        echo "The following commits would be cherry-picked to staging:"; \
+        echo "$$NEEDED" | grep -v '^$$'; \
+        echo ""; \
+        echo "Total: $$(echo "$$NEEDED" | grep -c .) commit(s)"; \
+    fi

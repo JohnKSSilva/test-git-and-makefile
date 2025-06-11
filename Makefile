@@ -1,7 +1,7 @@
 # Metropoles Backend Makefile
 # ------------------------------------------------------------------------------
 
-.PHONY: help push-staging current-branch cherry-pick-to-staging
+.PHONY: help push-staging current-branch cherry-pick-to-staging check-commits-to-staging
 
 # Default target when just running 'make'
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "  make push-staging     - Push current branch to staging (force push)"
 	@echo "  make current-branch   - Show current branch name"
 	@echo "  make cherry-pick-to-staging - Cherry-pick commits from main to staging"
+	@echo "  make check-commits-to-staging - Check which commits would be cherry-picked"
 
 # Get the current branch name
 CURRENT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
@@ -50,3 +51,20 @@ cherry-pick-to-staging:
 	git push origin staging && \
 	git checkout $$ORIG_BRANCH && \
 	echo "✅ Successfully cherry-picked commits to staging branch"
+
+# Check which commits would be cherry-picked without actually doing it
+check-commits-to-staging:
+	@echo "Checking commits that would be cherry-picked from main to staging..."
+	@git fetch origin main staging
+	@COMMITS=$$(git log main..$(CURRENT_BRANCH) --pretty=format:"%h - %s (%an)" | tac); \
+	if [ -z "$$COMMITS" ]; then \
+		echo "❌ No new commits to cherry-pick"; \
+		exit 1; \
+	else \
+		echo "The following commits would be cherry-picked to staging:"; \
+		echo "$$COMMITS" | while read commit; do \
+			echo "  • $$commit"; \
+		done; \
+		echo ""; \
+		echo "Total: $$(echo "$$COMMITS" | wc -l) commit(s)"; \
+	fi

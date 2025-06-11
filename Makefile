@@ -33,15 +33,13 @@ cherry-pick-to-staging:
     for commit in $$(git log main..$$ORIG_BRANCH --pretty=format:"%H" | tac); do \
         COMMIT_MSG=$$(git log --format=%B -n 1 $$commit | head -n 1); \
         echo "Cherry-picking commit: $$COMMIT_MSG"; \
-        if ! git cherry-pick -x $$commit 2>&1 | tee /tmp/cherry-pick.log | grep -q "The previous cherry-pick is now empty"; then \
-            if grep -q "The previous cherry-pick is now empty" /tmp/cherry-pick.log; then \
-                echo "Skipping commit (already applied): $$COMMIT_MSG"; \
-                git cherry-pick --skip; \
-            elif [ $$? -ne 0 ]; then \
-                echo "❌ Cherry-pick failed. Resolve conflicts and run 'git cherry-pick --continue'"; \
-                echo "After resolving, run 'git checkout $$ORIG_BRANCH' to return to your branch"; \
-                exit 1; \
-            fi; \
+        if git cherry-pick -x $$commit 2>&1 | tee /tmp/cherry-pick.log | grep -q "The previous cherry-pick is now empty"; then \
+            echo "Skipping commit (already applied or empty): $$COMMIT_MSG"; \
+            git cherry-pick --skip; \
+        elif grep -q "error: could not apply" /tmp/cherry-pick.log; then \
+            echo "❌ Cherry-pick failed. Resolve conflicts and run 'git cherry-pick --continue'"; \
+            echo "After resolving, run 'git checkout $$ORIG_BRANCH' to return to your branch"; \
+            exit 1; \
         fi; \
     done; \
     git push origin staging; \

@@ -31,7 +31,7 @@ cherry-pick-to-staging:
 	git fetch origin main staging && \
 	COMMITS=$$(git log main..$(CURRENT_BRANCH) --pretty=format:"%H") && \
 	if [ -z "$$COMMITS" ]; then \
-		echo "❌ No new commits to cherry-pick"; \
+		echo "No new commits to cherry-pick"; \
 		exit 1; \
 	fi && \
 	git checkout staging && \
@@ -40,7 +40,7 @@ cherry-pick-to-staging:
 		if git cherry staging | grep -q "+$$commit"; then \
 			echo "Cherry-picking commit: $$COMMIT_MSG" && \
 			if ! git cherry-pick -x $$commit; then \
-				echo "❌ Cherry-pick failed. Resolve conflicts and run 'git cherry-pick --continue'"; \
+				echo "Cherry-pick failed. Resolve conflicts and run 'git cherry-pick --continue'"; \
 				echo "After resolving, run 'git checkout $$ORIG_BRANCH' to return to your branch"; \
 				exit 1; \
 			fi; \
@@ -50,7 +50,7 @@ cherry-pick-to-staging:
 	done && \
 	git push origin staging && \
 	git checkout $$ORIG_BRANCH && \
-	echo "✅ Successfully cherry-picked commits to staging branch"
+	echo "Successfully cherry-picked commits to staging branch"
 
 # Check which commits would be cherry-picked without actually doing it
 check-commits-to-staging:
@@ -58,7 +58,7 @@ check-commits-to-staging:
 	@git fetch origin main staging
 	@COMMITS=$$(git log main..$(CURRENT_BRANCH) --pretty=format:"%h - %s (%an)" | tac); \
 	if [ -z "$$COMMITS" ]; then \
-		echo "❌ No new commits to cherry-pick"; \
+		echo "No new commits to cherry-pick"; \
 		exit 1; \
 	else \
 		echo "The following commits would be cherry-picked to staging:"; \

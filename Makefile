@@ -22,17 +22,18 @@ check-commits-to-staging:
 	@echo "Checking commits that would be cherry-picked from main to staging..."
 	@git fetch origin main staging
 	@ORIG_BRANCH=$(CURRENT_BRANCH); \
-	echo "The following commits would be cherry-picked to staging:"; \
-	echo ""; \
-	COUNT=0; \
-	git cherry staging $$ORIG_BRANCH | grep '^+' | while read status commit; do \
-		COMMIT_MSG=$$(git log --format="%h - %s (%an)" -n 1 $$commit); \
-		echo "  - $$COMMIT_MSG"; \
-		COUNT=$$((COUNT + 1)); \
-	done; \
-	if [ $$COUNT -eq 0 ]; then \
+	COMMITS=$$(git cherry staging $$ORIG_BRANCH | grep '^+' | cut -d' ' -f2); \
+	if [ -z "$$COMMITS" ]; then \
 		echo "❌ No new commits to cherry-pick"; \
 	else \
+		echo "The following commits would be cherry-picked to staging:"; \
+		echo ""; \
+		COUNT=0; \
+		for commit in $$COMMITS; do \
+			COMMIT_MSG=$$(git log --format="%h - %s (%an)" -n 1 $$commit); \
+			echo "  - $$COMMIT_MSG"; \
+			COUNT=$$((COUNT + 1)); \
+		done; \
 		echo ""; \
 		echo "Total: $$COUNT commit(s)"; \
 	fi

@@ -1,4 +1,4 @@
 # test-git-and-makefile
 Repositório para testes com arquivo Makefile
 
-teste 5
+teste 6

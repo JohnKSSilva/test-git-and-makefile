@@ -17,13 +17,33 @@ help:
 current-branch:
 	@echo "Current branch: $(CURRENT_BRANCH)"
 
-# Cherry-pick commits from current branch to staging (oldest to newest)
+# Check which commits would be cherry-picked (dry run)
+check-commits-to-staging:
+	@echo "Checking commits that would be cherry-picked from main to staging..."
+	@git fetch origin main staging
+	@ORIG_BRANCH=$(CURRENT_BRANCH); \
+	COMMITS=$$(git cherry staging $$ORIG_BRANCH | grep '^+' | cut -d' ' -f2); \
+	if [ -z "$$COMMITS" ]; then \
+		echo "❌ No new commits to cherry-pick"; \
+	else \
+		echo "The following commits would be cherry-picked to staging:"; \
+		echo ""; \
+		COUNT=0; \
+		for commit in $$COMMITS; do \
+			COMMIT_MSG=$$(git log --format="%h - %s (%an)" -n 1 $$commit); \
+			echo "  - $$COMMIT_MSG"; \
+			COUNT=$$((COUNT + 1)); \
+		done; \
+		echo ""; \
+		echo "Total: $$COUNT commit(s)"; \
+	fi
+
 cherry-pick-to-staging:
 	@echo "Cherry-picking commits from main to staging branch..."
 	@ORIG_BRANCH=$(CURRENT_BRANCH); \
 	git fetch origin main staging; \
 	git checkout staging; \
-	git rev-list --reverse main..$$ORIG_BRANCH | while read commit; do \
+	git cherry staging $$ORIG_BRANCH | grep '^+' | while read status commit; do \
 		COMMIT_MSG=$$(git log --format=%B -n 1 $$commit | head -n 1); \
 		echo "Cherry-picking commit: $$COMMIT_MSG"; \
 		if git cherry-pick -x $$commit 2>&1 | tee /tmp/cherry-pick.log; then \
@@ -41,24 +61,3 @@ cherry-pick-to-staging:
 	git push origin staging; \
 	git checkout $$ORIG_BRANCH; \
 	echo "✅ Successfully cherry-picked all commits to staging branch"
-
-# Check which commits would be cherry-picked (dry run)
-check-commits-to-staging:
-	@echo "Checking commits that would be cherry-picked from main to staging..."
-	@git fetch origin main staging
-	@ORIG_BRANCH=$(CURRENT_BRANCH); \
-	COMMITS=$$(git rev-list --reverse main..$$ORIG_BRANCH); \
-	if [ -z "$$COMMITS" ]; then \
-		echo "❌ No new commits to cherry-pick"; \
-	else \
-		echo "The following commits would be cherry-picked to staging:"; \
-		echo ""; \
-		COUNT=0; \
-		for commit in $$COMMITS; do \
-			COMMIT_MSG=$$(git log --format="%h - %s (%an)" -n 1 $$commit); \
-			echo "  - $$COMMIT_MSG"; \
-			COUNT=$$((COUNT + 1)); \
-		done; \
-		echo ""; \
-		echo "Total: $$COUNT commit(s)"; \
-	fi

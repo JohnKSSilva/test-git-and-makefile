@@ -1,3 +1,22 @@
+# Makefile for Git Cherry-pick Operations
+# ------------------------------------------------------------------------------
+
+.PHONY: help cherry-pick-to-staging check-commits-to-staging current-branch
+
+# Get the current branch name
+CURRENT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
+
+# Default target
+help:
+	@echo "Available commands:"
+	@echo "  make cherry-pick-to-staging   - Cherry-pick commits from current branch to staging"
+	@echo "  make check-commits-to-staging - Show commits that would be cherry-picked"
+	@echo "  make current-branch           - Show current branch name"
+
+# Show current branch name
+current-branch:
+	@echo "Current branch: $(CURRENT_BRANCH)"
+
 # Check which commits would be cherry-picked (dry run)
 check-commits-to-staging:
 	@echo "Checking commits that would be cherry-picked from $(CURRENT_BRANCH) to staging..."
@@ -56,8 +75,16 @@ cherry-pick-to-staging:
 	@ORIG_BRANCH=$(CURRENT_BRANCH); \
 	git fetch origin main staging; \
 	git checkout staging; \
+	echo "Debug: Original branch is $$ORIG_BRANCH"; \
+	echo "Debug: Commits to process:"; \
+	git rev-list --reverse main..$$ORIG_BRANCH | while read commit; do \
+		echo "  $$commit"; \
+	done; \
+	COMMITS_PROCESSED=0; \
 	for commit in $$(git rev-list --reverse main..$$ORIG_BRANCH); do \
+		COMMITS_PROCESSED=$$((COMMITS_PROCESSED + 1)); \
 		COMMIT_HASH=$$commit; \
+		echo "Debug: Processing commit $$COMMITS_PROCESSED: $$COMMIT_HASH"; \
 		if git rev-list main..staging | xargs -I {} git log --format='%B' -n 1 {} | grep -q "cherry picked from commit $$COMMIT_HASH"; then \
 			COMMIT_MSG=$$(git log --format="%h - %s" -n 1 $$commit); \
 			echo "⚠️  Skipping commit (already cherry-picked): $$COMMIT_MSG"; \
@@ -77,6 +104,11 @@ cherry-pick-to-staging:
 			fi; \
 		fi; \
 	done; \
-	git push origin staging; \
+	echo "Debug: Total commits processed: $$COMMITS_PROCESSED"; \
+	if [ $$COMMITS_PROCESSED -gt 0 ]; then \
+		git push origin staging; \
+	else \
+		echo "No commits to push"; \
+	fi; \
 	git checkout $$ORIG_BRANCH; \
 	echo "✅ Successfully cherry-picked all commits to staging branch"
